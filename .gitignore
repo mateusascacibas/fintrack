@@ -1,0 +1,9 @@
+target/
+.idea/
+*.iml
+.DS_Store
+*.class
+*.log
+*.hprof
+application-local.yml
+EOF
