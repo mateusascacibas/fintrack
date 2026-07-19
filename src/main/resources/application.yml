@@ -1,0 +1,117 @@
+spring:
+  application:
+    name: fintrack
+
+  # ──────────────────────────────────────────────
+  # DATABASE
+  # ──────────────────────────────────────────────
+  datasource:
+    url: jdbc:postgresql://localhost:5432/fintrack
+    username: fintrack
+    password: fintrack
+    # WHY HikariCP config here?
+    # HikariCP é o pool de conexões padrão do Spring Boot.
+    # Sem configurar, ele usa defaults que não são adequados para produção.
+    hikari:
+      pool-name: FintrackHikariPool
+      maximum-pool-size: 10       # Máximo de conexões simultâneas ao banco
+      minimum-idle: 2             # Conexões mantidas ativas mesmo sem uso
+      connection-timeout: 30000   # 30s para obter conexão do pool (lança exceção se exceder)
+      idle-timeout: 600000        # 10min — fecha conexões ociosas acima do minimum-idle
+      max-lifetime: 1800000       # 30min — força rotação de conexões (evita conexões zumbis)
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+      # WHY validate (not create-drop or update)?
+      # 'validate': Hibernate verifica se o schema do banco bate com as entidades.
+      # Lança exceção no startup se algo estiver errado. Seguro e explícito.
+      # 'update': Perigoso — pode alterar schema em produção sem controle.
+      # 'create-drop': Apaga tudo ao reiniciar. Nunca em produção.
+      # O Flyway é responsável por criar/alterar o schema. O Hibernate só valida.
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        # WHY default_batch_fetch_size?
+        # Mitiga o problema N+1 sem precisar de JOIN FETCH em toda query.
+        # Para cada associação lazy carregada, o Hibernate agrupa em batches de 20
+        # ao invés de fazer 1 query por entidade.
+        default_batch_fetch_size: 20
+
+  # ──────────────────────────────────────────────
+  # FLYWAY
+  # ──────────────────────────────────────────────
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    # WHY baseline-on-migrate?
+    # Se o banco já existir com dados (ex: você rodou o docker-compose antes),
+    # o Flyway não tenta recriar tudo — ele parte da baseline.
+
+  # ──────────────────────────────────────────────
+  # VIRTUAL THREADS (Java 21 + Spring Boot 3.2+)
+  # ──────────────────────────────────────────────
+  threads:
+    virtual:
+      enabled: true
+      # WHY virtual threads?
+      # Modelo tradicional: 1 request HTTP = 1 platform thread (caro, ~1MB de memória cada).
+      # Com virtual threads: milhares de threads leves gerenciadas pela JVM.
+      # Ganho real: throughput maior em aplicações I/O-bound (como esta, que espera banco/kafka).
+      # O código não muda — Spring gerencia automaticamente.
+      # Este é um diferencial importante para mencionar em entrevistas sobre Java 21.
+
+# ──────────────────────────────────────────────
+# SECURITY / JWT
+# ──────────────────────────────────────────────
+security:
+  jwt:
+    secret-key: "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"
+    # WARNING: Em produção, isso vai para um Secret Manager (AWS Secrets Manager, Vault).
+    # NUNCA commite uma secret real. Esta é apenas para desenvolvimento local.
+    expiration-ms: 86400000 # 24 horas em milissegundos
+
+# ──────────────────────────────────────────────
+# ACTUATOR / OBSERVABILITY
+# ──────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+        # WHY not expose all (*)?
+        # Endpoints como /actuator/env expõem variáveis de ambiente (senhas, secrets).
+        # Exponha apenas o necessário. Em produção, proteja com Spring Security.
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+      # WHY tags?
+      # Todas as métricas exportadas ao Prometheus terão a tag application=fintrack.
+      # No Grafana, você filtra dashboards por application. Essencial em ambientes
+      # com múltiplos serviços.
+
+# ──────────────────────────────────────────────
+# LOGGING
+# ──────────────────────────────────────────────
+logging:
+  level:
+    com.fintrack: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+    # TRACE em jdbc.bind mostra os valores dos parâmetros nas queries SQL.
+    # Útil para debug local. Nunca habilite em produção (pode logar dados sensíveis).
+  pattern:
+    # WHY structured logging format?
+    # Em produção, logs vão para sistemas como ELK ou CloudWatch.
+    # Formato estruturado (com timestamp, level, thread, trace) facilita correlação.
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{traceId}] %logger{36} - %msg%n"

@@ -1,0 +1,140 @@
+# ──────────────────────────────────────────────
+# FinTrack — Docker Compose
+#
+# Serviços disponíveis:
+#   Meses 1–6:  PostgreSQL
+#   Mês 7:      + Zookeeper + Kafka (descomente a seção)
+#   Mês 8:      + pipeline CI/CD (GitHub Actions, sem docker-compose)
+#   Mês 9:      + Redis + Prometheus + Grafana (descomente a seção)
+#
+# Como usar:
+#   docker-compose up -d          → sobe todos os serviços ativos
+#   docker-compose logs -f app    → acompanha logs da aplicação
+#   docker-compose down -v        → para e remove volumes (limpa dados)
+# ──────────────────────────────────────────────
+
+services:
+
+  # ──────────────────────────────────────────────
+  # POSTGRESQL — Banco principal
+  # ──────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: fintrack-postgres
+    environment:
+      POSTGRES_DB: fintrack
+      POSTGRES_USER: fintrack
+      POSTGRES_PASSWORD: fintrack
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fintrack"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fintrack-network
+
+  # ──────────────────────────────────────────────
+  # APLICAÇÃO SPRING BOOT
+  # Descomente quando quiser rodar tudo via Docker.
+  # Durante desenvolvimento, rode a app direto na IDE.
+  # ──────────────────────────────────────────────
+  # app:
+  #   build: .
+  #   container_name: fintrack-app
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/fintrack
+  #     SPRING_DATASOURCE_USERNAME: fintrack
+  #     SPRING_DATASOURCE_PASSWORD: fintrack
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   networks:
+  #     - fintrack-network
+
+  # ──────────────────────────────────────────────
+  # MÊS 7: KAFKA
+  # Descomente esta seção inteira quando chegar no Mês 7
+  # ──────────────────────────────────────────────
+  # zookeeper:
+  #   image: confluentinc/cp-zookeeper:7.6.0
+  #   container_name: fintrack-zookeeper
+  #   environment:
+  #     ZOOKEEPER_CLIENT_PORT: 2181
+  #   networks:
+  #     - fintrack-network
+  #
+  # kafka:
+  #   image: confluentinc/cp-kafka:7.6.0
+  #   container_name: fintrack-kafka
+  #   depends_on: [zookeeper]
+  #   ports:
+  #     - "9092:9092"
+  #   environment:
+  #     KAFKA_BROKER_ID: 1
+  #     KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+  #     KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+  #   networks:
+  #     - fintrack-network
+  #
+  # kafka-ui:
+  #   image: provectuslabs/kafka-ui:latest
+  #   container_name: fintrack-kafka-ui
+  #   ports:
+  #     - "8090:8080"
+  #   environment:
+  #     KAFKA_CLUSTERS_0_NAME: local
+  #     KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+  #   depends_on: [kafka]
+  #   networks:
+  #     - fintrack-network
+
+  # ──────────────────────────────────────────────
+  # MÊS 9: REDIS + PROMETHEUS + GRAFANA
+  # Descomente esta seção inteira quando chegar no Mês 9
+  # ──────────────────────────────────────────────
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: fintrack-redis
+  #   ports:
+  #     - "6379:6379"
+  #   networks:
+  #     - fintrack-network
+  #
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   container_name: fintrack-prometheus
+  #   ports:
+  #     - "9090:9090"
+  #   volumes:
+  #     - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+  #   networks:
+  #     - fintrack-network
+  #
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   container_name: fintrack-grafana
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     GF_SECURITY_ADMIN_PASSWORD: admin
+  #   volumes:
+  #     - grafana_data:/var/lib/grafana
+  #   depends_on: [prometheus]
+  #   networks:
+  #     - fintrack-network
+
+volumes:
+  postgres_data:
+  # grafana_data:  # Descomente no Mês 9
+
+networks:
+  fintrack-network:
+    driver: bridge

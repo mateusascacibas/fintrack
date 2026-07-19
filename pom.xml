@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<groupId>org.springframework.boot</groupId>
@@ -12,47 +12,148 @@
 	<artifactId>fintrack</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name/>
-	<description/>
-	<url/>
-	<licenses>
-		<license/>
-	</licenses>
-	<developers>
-		<developer/>
-	</developers>
-	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
-	</scm>
+	<description>Personal Finance Tracker — Study project for Java Senior evolution</description>
 	<properties>
 		<java.version>21</java.version>
+		<!--
+                    WHY JAVA 21?
+                    - Virtual Threads (Project Loom): Spring Boot 3.2+ suporta nativamente via
+                      spring.threads.virtual.enabled=true. Elimina o problema de thread-per-request
+                      sem mudar nada no código. Importante saber explicar em entrevistas.
+                    - Record Patterns e Pattern Matching: sintaxe mais limpa para DTOs e switch.
+                    - Sequenced Collections: API mais consistente para coleções ordenadas.
+                 -->
+		<jjwt.version>0.12.6</jjwt.version>
+		<testcontainers.version>1.20.1</testcontainers.version>
 	</properties>
 	<dependencies>
+		<!--  ==================== CORE ====================  -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-webmvc</artifactId>
+			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
-
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-devtools</artifactId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+			<!--
+                            WHY: Bean Validation (JSR-380) para validar DTOs de entrada.
+                            Regra: validação de formato/presença nos DTOs (interfaces/rest).
+                            Regra de negócio fica no domínio. São responsabilidades diferentes.
+                         -->
+		</dependency>
+		<!--  ==================== PERSISTENCE ====================  -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
-			<optional>true</optional>
 		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-flyway</artifactId>
+			<!--
+                            WHY FLYWAY (not Liquibase):
+                            Flyway usa SQL puro — você aprende SQL real, não abstrações.
+                            Liquibase usa XML/YAML, o que adiciona uma camada de indireção.
+                            Para aprendizado, Flyway é mais didático e transparente.
+                          -->
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-postgresql</artifactId>
+		</dependency>
+		<!--  ==================== SECURITY ====================  -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-api</artifactId>
+			<version>${jjwt.version}</version>
+			<!--
+                            WHY JJWT (manual) and not Spring Authorization Server?
+                            Fazer JWT na mão ensina o que acontece por baixo:
+                            - Como assinar e verificar tokens (HMAC-SHA256)
+                            - Claims: sub, iat, exp, roles
+                            - Por que JWT stateless é diferente de session
+                            Spring Authorization Server abstrai tudo isso — útil em produção,
+                            ruim para aprendizado de fundamentos.
+                         -->
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-impl</artifactId>
+			<version>${jjwt.version}</version>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-jackson</artifactId>
+			<version>${jjwt.version}</version>
+			<scope>runtime</scope>
+		</dependency>
+		<!--  ==================== OBSERVABILITY ====================  -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-registry-prometheus</artifactId>
+			<!--
+                            WHY: Expõe métricas no formato que o Prometheus entende.
+                            Junto com Grafana (no docker-compose), você terá dashboards reais
+                            de uma aplicação em execução — experiência de produção no local.
+                         -->
+		</dependency>
+		<!--  ==================== UTILS ====================  -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
 			<optional>true</optional>
+			<!--
+                            NOTE: Lombok reduz boilerplate mas oculta o que acontece.
+                            À medida que você avança no plano, considere migrar entidades
+                            de domínio para Java Records (Java 16+) — mais idiomático e
+                            sem processamento de anotações em tempo de compilação.
+                         -->
 		</dependency>
+		<!--  ==================== TESTING ====================  -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+			<!--  Inclui: JUnit 5, Mockito, AssertJ, MockMvc  -->
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<version>${testcontainers.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>postgresql</artifactId>
+			<version>${testcontainers.version}</version>
+			<scope>test</scope>
+			<!--
+                            WHY TESTCONTAINERS (not H2):
+                            H2 (banco em memória) não é PostgreSQL. Queries específicas do Postgres
+                            (window functions, JSONB, índices parciais) falham silenciosamente no H2.
+                            Testcontainers sobe um PostgreSQL real via Docker nos testes.
+                            Custo: testes mais lentos. Benefício: testes que refletem produção.
+                         -->
+		</dependency>
 	</dependencies>
-
 	<build>
 		<plugins>
 			<plugin>
@@ -67,43 +168,6 @@
 					</excludes>
 				</configuration>
 			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<executions>
-					<execution>
-						<id>default-compile</id>
-						<phase>compile</phase>
-						<goals>
-							<goal>compile</goal>
-						</goals>
-						<configuration>
-							<annotationProcessorPaths>
-								<path>
-									<groupId>org.projectlombok</groupId>
-									<artifactId>lombok</artifactId>
-								</path>
-							</annotationProcessorPaths>
-						</configuration>
-					</execution>
-					<execution>
-						<id>default-testCompile</id>
-						<phase>test-compile</phase>
-						<goals>
-							<goal>testCompile</goal>
-						</goals>
-						<configuration>
-							<annotationProcessorPaths>
-								<path>
-									<groupId>org.projectlombok</groupId>
-									<artifactId>lombok</artifactId>
-								</path>
-							</annotationProcessorPaths>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
 		</plugins>
 	</build>
-
 </project>
