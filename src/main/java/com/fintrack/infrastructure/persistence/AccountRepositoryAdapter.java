@@ -1,62 +1,59 @@
 package com.fintrack.infrastructure.persistence;
 
 import com.fintrack.domain.model.Account;
+import com.fintrack.domain.model.Transaction;
 import com.fintrack.domain.port.out.AccountRepository;
 import com.fintrack.infrastructure.persistence.entity.AccountJpaEntity;
+import com.fintrack.infrastructure.persistence.entity.TransactionJpaEntity;
 import com.fintrack.infrastructure.persistence.repository.AccountJpaRepository;
+import com.fintrack.infrastructure.persistence.repository.TransactionJpaRepository;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * AccountRepositoryAdapter — Adapter de saída (infraestrutura → domínio).
- *
- * PAPEL: Implementa AccountRepository (porta do domínio) usando Spring Data JPA.
- *
- * FLUXO:
- * AccountService → AccountRepository (interface do domínio)
- *                      ↑ implementado por
- *                 AccountRepositoryAdapter → AccountJpaRepository (Spring Data)
- *                                                ↓
- *                                          PostgreSQL
- *
- * @Component (not @Repository): @Repository é semântico para Spring Data interfaces.
- * Para adapters que implementam interfaces do domínio, @Component é mais preciso.
- */
 @Component
 public class AccountRepositoryAdapter implements AccountRepository {
 
-    private final AccountJpaRepository jpaRepository;
+    private final AccountJpaRepository     accountJpaRepository;
+    private final TransactionJpaRepository transactionJpaRepository;
 
-    public AccountRepositoryAdapter(AccountJpaRepository jpaRepository) {
-        this.jpaRepository = jpaRepository;
+    public AccountRepositoryAdapter(AccountJpaRepository accountJpaRepository,
+                                    TransactionJpaRepository transactionJpaRepository) {
+        this.accountJpaRepository     = accountJpaRepository;
+        this.transactionJpaRepository = transactionJpaRepository;
     }
 
     @Override
     public Account save(Account account) {
-        AccountJpaEntity entity = AccountJpaEntity.fromDomain(account);
-        AccountJpaEntity saved = jpaRepository.save(entity);
-        return saved.toDomain();
+        AccountJpaEntity saved = accountJpaRepository.save(AccountJpaEntity.fromDomain(account));
+        return saved.toDomain(loadTransactions(saved.getId()));
     }
 
     @Override
     public Optional<Account> findById(UUID id) {
-        return jpaRepository.findById(id)
-            .map(AccountJpaEntity::toDomain);
+        return accountJpaRepository.findById(id)
+                .map(entity -> entity.toDomain(loadTransactions(id)));
     }
 
     @Override
     public List<Account> findAllActive() {
-        return jpaRepository.findByActiveTrue()
-            .stream()
-            .map(AccountJpaEntity::toDomain)
-            .toList(); // Java 16+ — mais conciso que collect(Collectors.toList())
+        return accountJpaRepository.findByActiveTrue().stream()
+                .map(entity -> entity.toDomain(loadTransactions(entity.getId())))
+                .toList();
     }
 
     @Override
     public boolean existsByName(String name) {
-        return jpaRepository.existsByName(name);
+        return accountJpaRepository.existsByName(name);
+    }
+
+    private List<Transaction> loadTransactions(UUID accountId) {
+        return transactionJpaRepository
+                .findByAccountIdOrderByOccurredAtDesc(accountId)
+                .stream()
+                .map(TransactionJpaEntity::toDomain)
+                .toList();
     }
 }

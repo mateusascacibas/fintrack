@@ -132,7 +132,7 @@ public class AccountController {
         URI location = ServletUriComponentsBuilder
             .fromCurrentContextPath()
             .path("/api/v1/accounts/{accountId}/transactions/{transactionId}")
-            .buildAndExpand(accountId, transaction.getId())
+            .buildAndExpand(accountId, transaction.id())
             .toUri();
 
         return ResponseEntity.created(location).body(TransactionResponse.from(transaction));

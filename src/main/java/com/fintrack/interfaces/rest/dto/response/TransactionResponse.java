@@ -18,14 +18,14 @@ public record TransactionResponse(
 ) {
     public static TransactionResponse from(Transaction transaction) {
         return new TransactionResponse(
-            transaction.getId(),
-            transaction.getAccountId(),
-            transaction.getAmount(),
-            transaction.getType().name(),
-            transaction.getStatus().name(),
-            transaction.getDescription(),
-            transaction.getCategory(),
-            transaction.getOccurredAt()
+            transaction.id(),
+            transaction.accountId(),
+            transaction.amount(),
+            transaction.type().name(),
+            transaction.status().name(),
+            transaction.description(),
+            transaction.category(),
+            transaction.occurredAt()
         );
     }
 }
